@@ -1,0 +1,3003 @@
+#95% prediction interval#
+ts.plot(y)#
+lines(mean.x,col="red",lty=3)#
+lines(low.x,col="green",lty=3)#
+lines(up.x,col="green",lty=3)#
+legend("topright",c("y_t","E(x_t|y_0:t)","95% CI of x_t|y_0:t"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+ts.plot(y)#
+lines(mean.x,col="red",lty=3)#
+lines(low.x,col="green",lty=3)#
+lines(up.x,col="green",lty=3)#
+legend("topleft",c("y_t","E(x_t|y_0:t)","95% CI of x_t|y_0:t"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+ts.plot(y,ylab="")#
+lines(mean.x,col="red",lty=3)#
+lines(low.x,col="green",lty=3)#
+lines(up.x,col="green",lty=3)#
+legend("topleft",c("y_t","E(x_t|y_0:t)","95% CI of x_t|y_0:t"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+#95% prediction interval#
+ts.plot(y,ylab="")#
+lines(mean.x,col="red",lty=3)#
+lines(low.x,col="green",lty=3)#
+lines(up.x,col="green",lty=3)#
+legend("topleft",c("y_t","E(x_t|y_0:t)","95% CI of x_t|y_0:t"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_functions.R")
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)
+run[[5]]
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+mean.x=run[[6]]#
+mean.y.pred=run[[7]]
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")
+lines(mean.y.pred,col="red",lty=3)
+y
+mean.y.pred
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)#
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+mean.x=run[[6]]#
+mean.y.pred=run[[7]]#
+#
+#MCMC count#
+run[[5]]#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)#
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+mean.x=run[[6]]#
+mean.y.pred=run[[7]]#
+#
+#MCMC count#
+run[[5]]#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)
+y-mean.y.pred
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)#
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+mean.x=run[[6]]#
+mean.y.pred=run[[7]]#
+#
+#MCMC count#
+run[[5]]#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+low.y.pred=run[[8]]#
+up.y.pred=run[[9]]
+run
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)#
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+#mean.x=run[[6]]#
+mean.y.pred=run[[6]]#
+low.y.pred=run[[7]]#
+up.y.pred=run[[8]]#
+#
+#MCMC count#
+run[[5]]
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+mean.y.pred-y
+count(mean.y.pred-y<0=T)
+count(mean.y.pred-y<0)
+sum(mean.y.pred-y<0)
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			for(j in 2:h){#
+				Array[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array[,j+1,5]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array[,i+1,1]=Array[,j+1,1]#
+			Array[,i+1,5]=Array[,j+1,5]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x
+run=smc2(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			for(j in 2:h){#
+				Array[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array[,j+1,5]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array[,i+1,1]=Array[,j+1,1]#
+			Array[,i+1,5]=Array[,j+1,5]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+run=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+run=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)
+yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")
+Array=array(0,dim=c(N,T+1,4)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)
+Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.025)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.975)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x
+run=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma)
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+#mean.x=run[[6]]#
+mean.y.pred=run[[6]]#
+low.y.pred=run[[7]]#
+up.y.pred=run[[8]]
+run[[5]]
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")
+lines(mean.y.pred,col="red",lty=3)
+lines(low.y.pred,col="green",lty=3)
+lines(up.y.pred,col="green",lty=3)
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+y.mean.pred
+mean.y.pred
+mean.y.pred-y
+sum(mean.y.pred-y<0)
+low.y.pred
+up.y.pred
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			for(j in 2:h){#
+				Array[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array[,j+1,5]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array[,i+1,1]=Array[,j+1,1]#
+			Array[,i+1,5]=Array[,j+1,5]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	return(list(rh,sig,ta,loglik,count,mean.y.pred,low.y.pred,up.y.pred))#
+}
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			for(j in 2:h){#
+				Array[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array[,j+1,5]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array[,i+1,1]=Array[,j+1,1]#
+			Array[,i+1,5]=Array[,j+1,5]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+h
+run=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)
+run[[5]]
+rho_m=run[[1]]#
+sigma_m=run[[2]]#
+tau_m=run[[3]]#
+loglik=run[[4]]#
+mean.x=run[[6]]#
+mean.y.pred=run[[7]]#
+low.y.pred=run[[8]]#
+up.y.pred=run[[9]]
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="")#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+ts.plot(y,ylab="",ylim=c(-10,10))#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+rm(list=ls())
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_functions.R")
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); rho=runif(N,-1,1)#
+	sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			for(j in 2:h){#
+				Array[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array[,j+1,5]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			#Array[,i+1,1]=Array[,j+1,1]#
+			Array[,i+1,5]=Array[,j+1,5]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	mean.y.pred=colMeans(Array[,,5])#
+	low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+	up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10))#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=1 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10))#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+rho=0.8; tau=1; sigma=0.5; T=200; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=1 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10))#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+1|y_0:t)","95% CI of (y_t+1|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+run2[[5]]/T
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 2:h){#
+				Array_temp[,j+1,1]=rho*Array[,j,1]+tau*rt(N,df=df)#
+				Array_temp[,j+1,2]=Array[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,j+1,1]#
+			Array_temp[,i+1,2]=Array_temp[,j+1,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=1 #0<df<1 possible
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=1 #N=N_theta=N_x
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)
+rho=0.8; tau=1; sigma=0.5; T=100; df=3 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}#
+#
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=1 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]
+run2[[5]]/T
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10))#
+lines(mean.y.pred,col="red",lty=3)#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+ts.plot(y,ylab="",ylim=c(-10,10),main=h)
+ts.plot(y,ylab="",ylim=c(-10,10),main="h="h)
+ts.plot(y,ylab="",ylim=c(-10,10),main=h)#
+lines(mean.y.pred,col="red",lty=3,main="h=")
+ts.plot(y,ylab="",ylim=c(-10,10),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+rm(list=ls())
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_functions.R")
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 2:h){#
+				Array_temp[,j+1,1]=rho*Array_temp[,j,1]+tau*rt(N,df=df)#
+				Array_temp[,j+1,2]=Array_temp[,j+1,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,j+1,1]#
+			Array_temp[,i+1,2]=Array_temp[,j+1,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-10,10),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+rm(list=ls())
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_functions.R")
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x#
+h=2
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:h){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=2 #N=N_theta=N_x
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1+h,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:h){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]
+run2[[5]]/T
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+low.y
+low.y.pred
+low.y.pred[1:1+11]
+low.y.pred[1:2]
+low.y.pred[1:2+3]
+low.y.pred[1:(2+3)]
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1+h,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:h){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])[1:(T+1)]#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)[1:(T+1)]#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)[1:(T+1)]#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=10 #N=N_theta=N_x
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=1 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=2 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=20 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% prediction interval#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1+h,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:(h-1){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])[1:(T+1)]#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)[1:(T+1)]#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)[1:(T+1)]#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1+h,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:(h-1)){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])[1:(T+1)]#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)[1:(T+1)]#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)[1:(T+1)]#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=2 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% prediction interval#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+mean.y.pred
+smc2_pred<-function(N,T,y,df,sigma_rho,sigma_tau,sigma_sigma,h){#
+	start <- Sys.time ()#
+	yy=matrix(y[1:(T+1)],byrow=TRUE,nrow=N,ncol=T+1)#
+	w=matrix(1,nrow=N,ncol=T+1);ww=matrix(nrow=N,ncol=T+1)#
+	rho=vector("numeric"); sigma=vector("numeric"); tau=vector("numeric")#
+	rh=vector("numeric"); sig=vector("numeric"); ta=vector("numeric")#
+	loglik=vector("numeric")#
+	Array=array(0,dim=c(N,T+1,5)); Array_temp=array(0,dim=c(N,T+1+h,2))#
+	rho=runif(N,-1,1); sigma=rigamma(N,1,1); tau=rigamma(N,1,1)#
+	Array[,1,2]=rho; Array[,1,3]=sigma; Array[,1,4]=tau#
+	Array[,1,1]=rt(N,df=df); Array[,1,5]=Array[,1,1]+sigma*rt(N,df=df)#
+	Array_temp[,1,1]=Array[,1,1]; Array_temp[,1,2]=Array[,1,5]#
+	w[,1]=1/N#
+	ww[,1]=w[,1]/sum(w[,1])#
+	array_ind=sample(1:N,size=N,prob=ww[,1],replace=TRUE)#
+	Array[ ,1,]=Array[array_ind,1,]#
+	count=0#
+	for(i in 1:T){#
+		Array[,i+1,1]=rho*Array[,i,1]+tau*rt(N,df=df)#
+		Array[,i+1,5]=Array[,i+1,1]+sigma*rt(N,df=df)#
+		if(h>1){#
+			Array_temp[,i+1,1]=Array[,i+1,1]#
+			Array_temp[,i+1,2]=Array[,i+1,5]#
+			for(j in 1:(h-1)){#
+				Array_temp[,i+1+j,1]=rho*Array_temp[,i+j,1]+tau*rt(N,df=df)#
+				Array_temp[,i+1+j,2]=Array_temp[,i+1+j,1]+sigma*rt(N,df=df)#
+			}#
+			Array_temp[,i+1,1]=Array_temp[,i+h,1] #Array_temp[,i+1+h,1]#
+			Array_temp[,i+1,2]=Array_temp[,i+h,2] #Array_temp[,i+1+h,2]#
+		}#
+		Array[,i+1,2]=rho#
+		Array[,i+1,3]=sigma#
+		Array[,i+1,4]=tau#
+		w[,i+1]=1/sigma*dt((yy[,i+1]-Array[,i+1,1])/sigma,df=df)#
+		ww[,i+1]=w[,i+1]/sum(w[,i+1])#
+		if(1/sum(ww[,i+1]^2)>N/3){#
+			count=count+1#
+			gmhp=gmhp.one(rho_0=Array[,i+1,2],tau_0=Array[,i+1,4],sigma_0=Array[,i+1,3],sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,N=N,y=y)#
+			Array[,i+1,2]=gmhp[[1]] #rho#
+			Array[,i+1,3]=gmhp[[3]] #sigma#
+			Array[,i+1,4]=gmhp[[2]] #tau#
+			Array[,i+1,1]=Array[,i+1,2]*Array[,i,1]+Array[,i+1,4]*rt(N,df=df)#
+			w[,i+1]=1/Array[,i+1,3]*dt((yy[,i+1]-Array[,i+1,1])/Array[,i+1,3],df=df)#
+			ww[,i+1]=w[,i+1]/sum(w[,i+1])	#
+		}#
+		array_ind=sample(1:N,size=N,prob=ww[,i+1],replace=TRUE)#
+		Array[ ,i+1,]=Array[array_ind,i+1,]#
+		rho=Array[,i+1,2]#
+		sigma=Array[,i+1,3]#
+		tau=Array[,i+1,4]#
+		#means for rho, sigma and tau#
+		rh[i]=mean(Array[,i,2])#
+		sig[i]=mean(Array[,i,3])#
+		ta[i]=mean(Array[,i,4])#
+		loglik[i]=sum(log(colMeans(w)))#
+		if(i%%20==0){#
+    			time=Sys.time () - start#
+    			cat("t=",i,", time spent=",time,"\n")#
+    	}#
+	}#
+	mean.x=colMeans(Array[,,1])#
+	if(h==1){#
+		mean.y.pred=colMeans(Array[,,5])#
+		low.y.pred=apply(Array[,,5],2,quantile,prob=0.05)#
+		up.y.pred=apply(Array[,,5],2,quantile,prob=0.95)#
+	}else{#
+		mean.y.pred=colMeans(Array_temp[,,2])[1:(T+1)]#
+		low.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.05)[1:(T+1)]#
+		up.y.pred=apply(Array_temp[,,2],2,quantile,prob=0.95)[1:(T+1)]#
+	}#
+	return(list(rh,sig,ta,loglik,count,mean.x,mean.y.pred,low.y.pred,up.y.pred))#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=2 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% prediction interval#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; h=3 #N=N_theta=N_x#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m=run2[[1]]#
+sigma_m=run2[[2]]#
+tau_m=run2[[3]]#
+loglik=run2[[4]]#
+mean.x=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% prediction interval#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")
+source("SMC2_functions.R")
+h=5
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+run2[[5]]/T
+h
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x
+h=10
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+h
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+h
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+run2[[5]]/T
+h=20#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+rm(list=ls())#
+#set.seed(42)#
+library(pscl)#
+library(truncnorm)#
+library(coda)#
+#
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_functions.R")
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+#N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+exp(p2)
+plot(exp(p2),type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rnorm(1)#rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rnorm(1)#rt(1,df=df)#
+	y[n]=x[n]+sigma*rnorm(1)#rt(1,df=df)#
+}
+ts.plot(y)
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","95% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y)
+rho=0.8; tau=1; sigma=0.5; T=100; df=1 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+ts.plot(y)
+rho=0.8; tau=1; sigma=0.5; T=100; df=0.5 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+ts.plot(y)
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")#
+dev.off()#
+#
+#90% credible prediction interval of (y_t+h|y_0:t)#
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")#
+dev.off()
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+rho=0.8; tau=1; sigma=1; T=100; df=0.5 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-80,80),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+ts.plot(y)
+rho=0.8; tau=1; sigma=1; T=100; df=1 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+ts.plot(y)
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-80,80),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+exp(p2)
+p2
+sum(p2)
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rnorm(1)#rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rnorm(1)#rt(1,df=df)#
+	y[n]=x[n]+sigma*rnorm(1)#rt(1,df=df)#
+}
+ts.plot(y)
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-80,80),main=paste("h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+sum(h2)
+sum(p2)
+dt(10)
+dt(10,df=1)
+dt(10,df=0.5)
+dnorm(10)
+rm(list=ls())#
+#set.seed(42)#
+library(pscl)#
+library(truncnorm)#
+library(coda)#
+#
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_G_functions.R")#
+#
+rho=0.8; tau=1; sigma=2; T=100#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+xg=vector("numeric")#
+yg=vector("numeric")#
+xg[1]=rnorm(1)#
+for(n in 1:(T+1)){#
+	xg[n+1]=rho*xg[n]+tau*rnom(1)#
+	yg[n]=xg[n]+sigma*rnorm(1)#
+}
+rm(list=ls())#
+#set.seed(42)#
+library(pscl)#
+library(truncnorm)#
+library(coda)#
+#
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/SMC^2:Sequential PF")#
+source("SMC2_G_functions.R")#
+#
+rho=0.8; tau=1; sigma=2; T=100#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+xg=vector("numeric")#
+yg=vector("numeric")#
+xg[1]=rnorm(1)#
+for(n in 1:(T+1)){#
+	xg[n+1]=rho*xg[n]+tau*rnorm(1)#
+	yg[n]=xg[n]+sigma*rnorm(1)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(yg,ylab="",ylim=c(-20,20),main=paste("GLM with h=", h))#
+lines(mean.y.pred_g,col="red",lty=3,main="h=")#
+lines(low.y.pred_g,col="green",lty=3)#
+lines(up.y.pred_g,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(pg,ylab="Predictive log-likelihod")
+rho=0.8; tau=1; sigma=2; T=200#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+xg=vector("numeric")#
+yg=vector("numeric")#
+xg[1]=rnorm(1)#
+for(n in 1:(T+1)){#
+	xg[n+1]=rho*xg[n]+tau*rnorm(1)#
+	yg[n]=xg[n]+sigma*rnorm(1)#
+}
+plot(yg)
+N=10000; sigma_rho=0.2; sigma_tau=0.2; sigma_sigma=0.2 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+rho=0.8; tau=1; sigma=2; T=100#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+xg=vector("numeric")#
+yg=vector("numeric")#
+xg[1]=rnorm(1)#
+for(n in 1:(T+1)){#
+	xg[n+1]=rho*xg[n]+tau*rnorm(1)#
+	yg[n]=xg[n]+sigma*rnorm(1)#
+}
+N=10000; sigma_rho=0.05; sigma_tau=0.05; sigma_sigma=0.05 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+N=10000; sigma_rho=0.2; sigma_tau=0.02; sigma_sigma=0.02 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+rho=0.8; tau=1; sigma=0.5; T=100#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+xg=vector("numeric")#
+yg=vector("numeric")#
+xg[1]=rnorm(1)#
+for(n in 1:(T+1)){#
+	xg[n+1]=rho*xg[n]+tau*rnorm(1)#
+	yg[n]=xg[n]+sigma*rnorm(1)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+source("SMC2_functions.R")
+rho=0.8; tau=1; sigma=0.5; T=100; df=0.5 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+rho=0.8; tau=1; sigma=0.5; T=100; df=2 #0<df<1 possible#
+#
+### Calculate y_[0:T] and trajectory x*_[0:T]#
+x=vector("numeric")#
+y=vector("numeric")#
+x[1]=rt(1,df=df)#
+for(n in 1:(T+1)){#
+	x[n+1]=rho*x[n]+tau*rt(1,df=df)#
+	y[n]=x[n]+sigma*rt(1,df=df)#
+}
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1 #N=N_theta=N_x#
+h=1#
+run2=smc2_pred(N=N,T=T,y=y,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("t Model with h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+sum(p2)
+ts.plot(y)
+ts.plot(yg)
+run_g=smc2_pred_g(N=N,T=T,y=y,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(yg,ylab="",ylim=c(-20,20),main=paste("GLM with h=", h))#
+lines(mean.y.pred_g,col="red",lty=3,main="h=")#
+lines(low.y.pred_g,col="green",lty=3)#
+lines(up.y.pred_g,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(pg,ylab="Predictive log-likelihod")
+sum(pg)
+yg
+run_g=smc2_pred_g(N=N,T=T,y=yg,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_mg=run_g[[1]]#
+sigma_mg=run_g[[2]]#
+tau_mg=run_g[[3]]#
+loglikg=run_g[[4]]#
+mean.xg=run_g[[6]]#
+mean.y.pred_g=run_g[[7]]#
+low.y.pred_g=run_g[[8]]#
+up.y.pred_g=run_g[[9]]#
+pg=run_g[[10]]#
+#
+#MCMC count#
+run_g[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_mg,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_mg,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_mg,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+plot(loglikg,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(yg,ylab="",ylim=c(-20,20),main=paste("GLM with h=", h))#
+lines(mean.y.pred_g,col="red",lty=3,main="h=")#
+lines(low.y.pred_g,col="green",lty=3)#
+lines(up.y.pred_g,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(pg,ylab="Predictive log-likelihod")
+sum(pg)
+run2=smc2_pred(N=N,T=T,y=yg,df=df,sigma_rho=sigma_rho,sigma_tau=sigma_tau,sigma_sigma=sigma_sigma,h=h)#
+rho_m2=run2[[1]]#
+sigma_m2=run2[[2]]#
+tau_m2=run2[[3]]#
+loglik2=run2[[4]]#
+mean.x2=run2[[6]]#
+mean.y.pred=run2[[7]]#
+low.y.pred=run2[[8]]#
+up.y.pred=run2[[9]]#
+p2=run2[[10]]#
+#
+#MCMC count#
+run2[[5]]/T#
+#
+par(mfrow=c(2,2))#
+plot(rho_m2,ylab=expression(rho),xlab="Time",type="l",ylim=c(0,1))#
+abline(h=0.8,col="red")#
+plot(sigma_m2,ylab=expression(sigma),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=0.5,col="red")#
+plot(tau_m2,ylab=expression(tau),xlab="Time",type="l",ylim=c(0,3))#
+abline(h=1,col="red")#
+plot(loglik2,ylab=expression(logp[y[0:t]]),xlab="Time",type="l")
+par(mfrow=c(2,1))#
+ts.plot(y,ylab="",ylim=c(-20,20),main=paste("t Model with h=", h))#
+lines(mean.y.pred,col="red",lty=3,main="h=")#
+lines(low.y.pred,col="green",lty=3)#
+lines(up.y.pred,col="green",lty=3)#
+legend("topleft",c("y_t","E(y_t+h|y_0:t)","90% CI of (y_t+h|y_0:t)"),lty=c(1,3,3,3),col=c("black","red","green","green"))#
+ts.plot(p2,ylab="Predictive log-likelihod")
+sum(pg)
+sum(p2)

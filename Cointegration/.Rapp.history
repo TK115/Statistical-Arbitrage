@@ -1,0 +1,247 @@
+install.packages("quantmod")#
+install.packages("tseries")#
+install.packages("fUnitRoots")#
+install.packages("Quandl")#
+install.packages("urca") #ca.jo#
+install.packages("vars")#
+install.packages("tsDyn")#
+install.packages("HAC")#
+library(quantmod)#
+library(tseries) #adf.test; kpss.test#
+library(fUnitRoots) #adfTest#
+library(Quandl)#
+library(urca)#
+library(vars)#
+library(tsDyn) #better Johansen cointegration test#
+library(HAC) #HAC regression#
+#
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/Cointegration")
+rm(list=ls())#
+AAPL<-Quandl("WIKI/AAPL")#
+IBM<-Quandl("WIKI/IBM")#
+MSFT<-Quandl("WIKI/MSFT")#
+COKE<-Quandl("WIKI/COKE")#
+PEP<-Quandl("WIKI/PEP")#
+AAPL.close<-AAPL$Close#
+IBM.close<-IBM$Close#
+MSFT.close<-MSFT$Close#
+COKE.close<-COKE$Close#
+PEP.close<-PEP$Close
+i=11
+ibm=IBM.close[(170*(i-1)):(170*i)]
+apple=AAPL.close[(170*(i-1)):(170*i)]
+cor(apple,ibm)
+ra=log(diff(apple))
+ra
+ra=diff(log(apple))
+ra
+rb=diff(log(ibm))
+abs(cov(ra,rb)/sqrt(var(ra)*var(rb)))
+cor(diff(log(apple)),diff(log(ibm)))
+i
+cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(AAPL.close[(170*(i-1)):(170*i)],0.8,0.01)))
+cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(AAPL.close[(170*(i-1)):(170*i)])))
+for(i in 1:40){#
+	a=abs(cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(AAPL.close[(170*(i-1)):(170*i)]))))#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=abs(cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(AAPL.close[(170*(i-1)):(170*i)]))))#
+	print(c(a,int(i)))#
+}
+digits(1.00,2)
+?digits
+?dig
+for(i in 1:40){#
+	a=abs(cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(AAPL.close[(170*(i-1)):(170*i)]))))#
+	print(c(a,as.integer(i)))#
+}
+as.integer(3.14)
+as.integer(3.000)
+for(i in 1:40){#
+	a=abs(cor(diff(log(IBM.close[(170*(i-1)):(170*i)])),diff(log(MSFT.close[(170*(i-1)):(170*i)]))))#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+source("Cointegration_functions.R")
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+source("Cointegration_functions.R")
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+source("Cointegration_functions.R")
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.3,0.05)[[1]]#
+	print(c(a,i))#
+}
+a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.1,0.05)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.05,0.05)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(AAPL.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.3,0.05)[[1]]#
+	print(c(a,i))#
+}
+source("Cointegration_functions.R")
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=11#
+#
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.05,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=10#
+#
+for(i in 1:40){#
+	a=create.spread.opt(AAPL.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=7#
+#
+for(i in 1:30){#
+	a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=11#
+#
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=10#
+#
+for(i in 1:40){#
+	a=create.spread.opt(AAPL.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=7#
+#
+for(i in 1:30){#
+	a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+source("Cointegration_functions.R")
+for(i in 1:40){#
+	a=create.spread(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+create.spread.opt
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=11#
+#
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=10#
+#
+for(i in 1:40){#
+	a=create.spread.opt(AAPL.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.2,0.05)[[1]]#
+	print(c(a,i))#
+}#
+# cointigration for i=7#
+#
+for(i in 1:30){#
+	a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+i=2
+a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[2]]
+ts.plot(a)
+acf(a)
+install.packages("tsDyn")
+library(tsDyn) #better Johansen cointegration test
+install.packages("urca") #ca.jo
+library(urca)
+apple=log(AAPL.close)#
+ibm=log(IBM.close)#
+ibm=ibm[1:length(apple)]#
+data=cbind(apple,ibm)
+rank.test
+?rank.test
+varest <- VAR(data,p=1,type="const",lag.max=(12*(length(ibm)/100)^0.25), ic="AIC")#
+# obtain lag length of VAR that best fits the data#
+lagLength <- max(2,varest$p)
+res <- ca.jo(data,type="trace",ecdet="const",K=lagLength,spec="longrun")#
+summary(res)
+rank.test(data, type = "eigen", r_null, cval = 0.05)
+data
+rank.test(VECM(data), type = "eigen", r_null, cval = 0.05)
+VECM(data)
+VECM(data,lag=lagLength)
+rank.test(VECM(data,lag=lagLength), type = "eigen", r_null, cval = 0.05)
+rank.test(VECM(data,lag=lagLength,estim="ML"), type = "eigen", r_null, cval = 0.05)
+rank.test(VECM(data,lag=lagLength,estim="ML"), type = "eigen", cval = 0.05)
+rank.test(VECM(data,lag=lagLength,estim="ML"), type = "eigen", r_null=1,cval = 0.05)
+rank.test(VECM(data,lag=lagLength,estim="ML"), type = "eigen", r_null=2,cval = 0.05)
+?co.ja
+?ca.jo
+i=2
+a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[2]]
+ts.plot(a)
+i
+apple=log(PEP.close[(170*(i-1)):(170*i)])
+ibm=log(COKE.close[(170*(i-1)):(170*i)],0.2,0.01))
+ibm=log(COKE.close[(170*(i-1)):(170*i)]))
+ibm=log(COKE.close[(170*(i-1)):(170*i)])
+ibm=ibm[1:length(apple)]#
+data=cbind(apple,ibm)
+varest <- VAR(data,p=1,type="const",lag.max=(12*(length(ibm)/100)^0.25), ic="AIC")
+lagLength <- max(2,varest$p)
+res <- ca.jo(data,type="trace",ecdet="const",K=lagLength,spec="transitory")#
+summary(res)
+for(i in 1:30){#
+	a=create.spread.opt(PEP.close[(170*(i-1)):(170*i)],COKE.close[(170*(i-1)):(170*i)],0.2,0.01)[[1]]#
+	print(c(a,i))#
+}
+names(summary(res))
+i=11
+i=10
+ibm=log(IBM.close[(170*(i-1)):(170*i)])
+apple=log(MSFT.close[(170*(i-1)):(170*i)])
+ibm=ibm[1:length(apple)]#
+data=cbind(apple,ibm)
+varest <- VAR(data,p=1,type="const",lag.max=(12*(length(ibm)/100)^0.25), ic="AIC")#
+# obtain lag length of VAR that best fits the data#
+lagLength <- max(2,varest$p)
+for(i in 1:40){#
+	a=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.02,0.05)[[1]]#
+	print(c(a,i))#
+}
+res <- ca.jo(data,type="trace",ecdet="const",K=lagLength,spec="transitory")#
+summary(res)
+?ca.jo

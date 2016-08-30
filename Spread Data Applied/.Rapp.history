@@ -1,0 +1,2425 @@
+ibm=IBM.close[(170*(i-1)):(170*i)]
+apple=AAPL.close[(170*(i-1)):(170*i)]
+cor(apple,ibm)
+la=log(apple)
+li=log(ibm)
+cor(diff(li),diff(la))
+install.packages("PerformanceAnalytics")
+library(PerformanceAnalytics)
+ra=Return.calculate(ibm,method="log")
+ra=CalculateReturns(ibm,method="log")
+install.packages("tseries")#
+install.packages("fUnitRoots")#
+install.packages("quantmod")#
+install.packages("Quandl")#
+install.packages("crch")#
+install.packages("pscl")#
+install.packages("truncnorm")#
+install.packages("coda")#
+library(tseries) #adf.test; kpss.test#
+library(fUnitRoots) #adfTest#
+library(quantmod)#
+library(Quandl)#
+library(crch)#
+library(pscl)#
+library(truncnorm)#
+library(coda)
+source("Cointegration_functions.R")#
+source("PMCMC_functions.R")
+i=11#
+spread1=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],AAPL.close[(170*(i-1)):(170*i)],0.8,0.01)[[2]]#
+y1=ROC(spread1, type='discrete', na.pad=FALSE)#
+#
+# IBM.close/MSFT.close i=10#
+i=10#
+spread2=create.spread.opt(IBM.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.8,0.05)[[2]]#
+y2=ROC(spread2, type='discrete', na.pad=FALSE)#
+#
+# AAPL.close/MSFT.close i=7#
+i=7#
+spread3=create.spread.opt(AAPL.close[(170*(i-1)):(170*i)],MSFT.close[(170*(i-1)):(170*i)],0.8,0.05)[[2]]#
+y3=ROC(spread3, type='discrete', na.pad=FALSE)
+sigma=0.8; N=100; df=2; nsteps=1e3#25000
+ptm <- proc.time()#
+gmhp_run=gmhp(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run[[1]]#
+Tau.p=gmhp_run[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+par(mfrow=c(2,2))#
+ts.plot(Rho.p,main="Trace Plot",ylab=expression(rho))#
+acf(Rho.p,main=expression(rho))#
+ts.plot(Tau.p,main="Trace Plot",ylab=expression(tau))#
+acf(Tau.p,main=expression(tau))
+sigma=0.8; N=100; df=2; nsteps=1e4#25000#
+#
+ptm <- proc.time()#
+gmhp_run=gmhp(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run[[1]]#
+Tau.p=gmhp_run[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+par(mfrow=c(3,2)) #21
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+ts.plot(Rho.p,main="Trace Plot",ylab=expression(rho))#
+acf(Rho.p,main=expression(rho))#
+ts.plot(Tau.p,main="Trace Plot",ylab=expression(tau))#
+acf(Tau.p,main=expression(tau))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(X[i-1]==X[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			else temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(Z[i]==Z[i-1] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=remp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z))#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(X[i-1]==X[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			else temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(Z[i]==Z[i-1] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z))#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+sigma=0.8; N=100; df=2; nsteps=1e4
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1])#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i]==X[i-1] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i]==X[i-1] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}#
+#
+sigma=0.8; N=100; df=2; nsteps=1e4#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i]==Z[i-1] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			else temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+nsteps
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+head(X)
+head(Rho.p)
+head(Tau.p)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2) temp_tau[i-1]=temp_tau[i-2]#
+			else temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2) temp_rho[i-1]=temp_rho[i-2]#
+    		else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+head(Rho.p)
+head(Tau.p)
+i=2
+X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau
+X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=0; Z[1]=0.8; #rho, tau
+W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)
+W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=0.15) #proposal for tau#
+    		U1 <- runif(1)
+temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)
+temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)
+temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)
+temp_tau
+min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1))
+)
+min(p(tau=Z[i],rho=Y,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)
+Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho
+Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=2.5) #proposal for rho
+min(p(tau=Z[i],rho=Y,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)
+Z
+temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)
+temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(ypread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)
+temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(spread2)-1,y=spread2,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	tau_temp[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=tau_temp[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			rho_temp[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0) rho_temp[i]=rho_temp[i-1]#
+    			else rho_temp[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=rho_temp[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0) tau_temp[i]=tau_temp[i-1]#
+    		else tau_temp[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+sigma=0.8; N=100; df=2; nsteps=1e4
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			temp_rho[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0) temp_rho[i]=temp_rho[i-1]#
+    			else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0) temp_tau[i]=temp_tau[i-1]#
+    		else temp_tau[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			temp_rho[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0) temp_rho[i-1]=temp_rho[i-2]#
+    			else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0) temp_tau[i]=temp_tau[i-1]#
+    		else temp_tau[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+gmhp_run=gmhp(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+head(Rho.p)
+mean(Tau.p)
+mean(Rho.p)
+Rho.p
+Tau.p
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			temp_rho[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0 && status_tau==0) temp_rho[i-1]=temp_rho[i-2]#
+    			else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0 && status_rho==0) temp_tau[i]=temp_tau[i-1]#
+    		else temp_tau[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+sigma=0.8; N=100; df=2; nsteps=1e4#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+Rho.p
+Tau.p
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			temp_rho[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0 && status_tau==0 && 1=0) temp_rho[i-1]=temp_rho[i-2]#
+    			else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0 && status_rho==0 && 1=0) temp_tau[i]=temp_tau[i-1]#
+    		else temp_tau[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[1],1,1)),1)#
+	for (i in 2:nsteps){#
+    		W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		status_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		status_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(i==2){#
+    			temp_rho[1]=min(p(tau=Z[2],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[2],1,1)/(p(tau=Z[2],rho=X[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[2],1,1)),1)#
+    		}else{#
+    			if(status_rho==0 && status_tau==0 && 1==0) temp_rho[i-1]=temp_rho[i-2]#
+    			else temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		status_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		status_rho=0#
+    		}#
+    		if(status_tau==0 && status_rho==0 && 1==0) temp_tau[i]=temp_tau[i-1]#
+    		else temp_tau[i]=min(p(rho=X[i],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i],tau=Z[i],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+	}#
+	return(list(X,Z))#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+# rejection probability#
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2 1==0){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2 1==0){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && i>2 && 1==0){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(X[i-1]==X[i-2] && i>2 && 1==0){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+X
+Rho.p
+Tau.p
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	#temp_tau[1]=min(p(rho=X[1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[1],tau=Z[1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0){#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    		}else{#
+        		X[i] <- X[i-1]#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e4
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==0 && signal_tau==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 && signal_tau==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+Rho.p
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==1 || signal_tau==1){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==1 || signal_tau==1){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==0 || signal_tau==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 || signal_tau==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e3#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==0 && signal_tau==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		cat(signal_tau,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 && signal_tau==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		cat(signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e2
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		cat(signal_tau,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		cat(signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p)) #0.22
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+Rho.p=gmhp_run_fast[[1]]#
+Tau.p=gmhp_run_fast[[2]]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		cat("Signal Tau",signal_tau,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}#
+#
+sigma=0.8; N=100; df=2; nsteps=1e2
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+set.seed=123
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+set.seed=123
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && 1==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1e2#
+set.seed=123
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=50
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in: Temp_tau",temp_tau[i-1],"\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in: Temp_rau",temp_rho[i-1],"\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && 0==0){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=100
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=100
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+sigma=0.8; N=100; df=2; nsteps=1000
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+sigma=0.8; N=100; df=2; nsteps=10000
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=2.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+c=c(1,2,3,4,5)
+prod(c)
+exp(sum(log(c)))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1000
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.1,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+c
+c[-1:2]
+c[-(1:2)]
+Rho.p=gmhp_run_fast[[1]][-1:(nsteps/10)]#
+Tau.p=gmhp_run_fast[[2]][-1:(nsteps/10)]
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p)) #0.22
+sigma=0.8; N=100; df=2; nsteps=10000
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=10000
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.1,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-1:(nsteps/10)]#
+Tau.p=gmhp_run_fast[[2]][-1:(nsteps/10)]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+Rho.p=gmhp_run_fast[[1]]#[-1:(nsteps/10)]
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")
+sigma=0.8; N=100; df=2; nsteps=10000
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=1,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p)) #0.22
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				#cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				#cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			#cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			#cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.2,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+sigma=0.8; N=100; df=2; nsteps=1000
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.2,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.1,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+summary(as.mcmc(Rho.p))#
+summary(as.mcmc(Tau.p))
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p)) #0
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.15,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+1-rejectionRate(mcmc(Rho.p)) #0.35#
+1-rejectionRate(mcmc(Tau.p))
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				#cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				#cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			#cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			#cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1000
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.18,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==1 && signal_tau==1){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				#cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				#cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==1 && signal_tau==1){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			#cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			#cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1000
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=0; signal_tau=0#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==1 && signal_tau==1){ #Z[i-1]==Z[i-2] && X[i-1]==X[i-2] && i>2 && 1==0#
+				temp_tau[i-1]=temp_tau[i-2]#
+				#cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				#cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		#cat("Signal Tao",signal_tao,"\n")#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+    		if(signal_rho==1 && signal_tau==1){ #Z[i]==Z[i-1] && X[i-1]==X[i-2] && i>2 && 1==0#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			#cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			#cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+    		#cat("Signal Rho",signal_rho,"\n")#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+sigma=0.8; N=100; df=2; nsteps=1000#
+set.seed=123#
+#
+ptm <- proc.time()#
+gmhp_run_fast=gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)#
+proc.time() - ptm#
+#
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+spread2
+as.vector(spread2)
+a=[1]  2.891657e-05 -8.693294e-03  6.803368e-03 -2.236363e-03 -6.937419e-03#
+  [6] -1.354955e-02 -7.370743e-03  1.164157e-02  3.577696e-03  1.037148e-02#
+ [11]  1.051344e-02 -5.895949e-03 -6.262150e-03 -1.436275e-03 -1.067199e-02#
+ [16]  1.708590e-03  1.291279e-02  1.657489e-02  8.718418e-03  1.022723e-02#
+ [21]  1.249108e-02  4.578435e-03  1.220556e-02  1.110395e-02  8.940932e-04#
+ [26]  1.224446e-02 -1.654568e-03  6.345032e-06  5.374296e-03  2.624225e-04#
+ [31]  7.089327e-03  4.071452e-03  6.024617e-03  3.637305e-03 -1.076753e-02#
+ [36] -8.430572e-03  7.543846e-04  9.749860e-03  6.136395e-03  6.837963e-03#
+ [41]  1.347146e-02  2.245625e-02  3.620450e-03  7.774841e-03  1.283833e-02#
+ [46]  3.522257e-03  1.082267e-02  7.880999e-03  1.218622e-02 -2.237127e-03#
+ [51] -5.691487e-03 -1.218385e-02 -8.382525e-03 -1.856266e-02 -1.345401e-02#
+ [56] -2.459351e-02 -7.056840e-03 -1.558915e-02  8.388915e-03 -3.859021e-03#
+ [61] -8.347007e-03 -2.609995e-02 -1.179183e-02 -4.856719e-03 -1.640646e-02#
+ [66] -1.116579e-02 -1.364126e-02  1.881610e-02  1.418743e-02  3.594486e-02#
+ [71]  1.156881e-02  1.868702e-02  1.545050e-03  1.166707e-02  7.457795e-03#
+ [76]  1.532652e-02  2.117908e-04  6.433484e-03  8.761382e-03  1.844815e-02#
+ [81]  6.806060e-03  2.561523e-02  1.390785e-02  1.186323e-02  1.443480e-03#
+ [86] -7.400185e-04 -2.431535e-04 -8.845345e-03 -1.069423e-02 -1.258305e-02#
+ [91]  7.806088e-03 -6.171493e-04  1.159409e-02  8.468538e-03  9.318565e-03#
+ [96]  1.678071e-03 -8.631110e-03 -4.847378e-03 -6.166083e-03 -6.359008e-03#
+[101] -7.018183e-03 -6.237949e-04 -1.621241e-02 -1.327708e-02  1.811439e-03#
+[106] -8.364995e-04 -3.391604e-04 -1.046036e-02 -1.596353e-03  1.016254e-03#
+[111]  3.387266e-04 -1.465149e-03 -4.519335e-03 -1.181839e-02 -8.113083e-04#
+[116]  2.739954e-04 -5.405669e-03 -2.525103e-02 -2.186415e-02 -3.597366e-02#
+[121] -3.123317e-02 -2.855623e-02 -3.320408e-02 -1.247758e-02 -3.070937e-02#
+[126] -3.487971e-02 -4.743554e-02 -4.661577e-02 -1.811265e-02 -1.206648e-02#
+[131]  4.088532e-03  9.219294e-03 -2.234893e-03  4.645058e-02  4.617443e-02#
+[136]  4.717125e-02  4.965086e-02  4.227484e-02  1.560137e-02  1.772256e-02#
+[141]  1.500574e-02  1.573426e-03  3.030491e-03 -1.159499e-02  4.091094e-03#
+[146] -1.592578e-02 -1.202573e-02  1.289941e-03  4.500654e-03 -2.562628e-03#
+[151]  7.523681e-03  6.260610e-03  1.806870e-02  1.681744e-02  1.569096e-02#
+[156] -3.206188e-03 -7.151959e-03 -1.096521e-02 -1.193900e-02 -2.195293e-02#
+[161] -1.499095e-02 -1.307995e-02 -1.950468e-02 -1.318171e-02 -3.849726e-03#
+[166]  5.393271e-03 -3.876359e-03  5.819367e-03  5.991899e-03  2.899221e-03#
+[171]  5.547905e-03
+get.wd()
+getwd()
+setwd("/Users/tillkischkat/Desktop")
+write.csv(spread2, file = "spread2.csv",row.names=FALSE,col.names=FALSE)
+a=read.csv("spread.csv",header=T)
+a=read.csv("spread2.csv",header=T)
+a
+as.vector(a)
+sigma=0.8; N=100; df=2; nsteps=100
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=a)
+a-spread2
+spread2
+i
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=a)
+i=171
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=a)
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+gmhp.fast<-function(rho_0,tau_0,sigma_rho,sigma_tau,nsteps,y){#
+	X=numeric(); Z=numeric(); temp_rho=numeric(); temp_tau=numeric()#
+	X[1]=rho_0; Z[1]=tau_0; #rho, tau#
+	signal_rho=1; signal_tau=1#
+	for (i in 2:nsteps){#
+			W <- rtruncnorm(1,0.05,1.5, mean=Z[i-1],sd=sigma_tau) #proposal for tau#
+    		U1 <- runif(1)#
+			#cat("Signal Tau",signal_tau,"Signal Rho",signal_rho,"\n")#
+			if(signal_rho==0 && signal_tau==0 && i>nsteps/10){#
+				temp_tau[i-1]=temp_tau[i-2]#
+				#cat("in: Temp_tau",temp_tau[i-1],"\n\n")#
+			}else{#
+				temp_tau[i-1]=min(p(rho=X[i-1],tau=W,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(W,1,1)/(p(rho=X[i-1],tau=Z[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i-1],1,1)),1)#
+				#cat("out: Temp_tau",temp_tau[i-1],"\n\n")#
+			}#
+    		if (U1<=temp_tau[i-1]){ #tau#
+        		Z[i] <- W#
+        		signal_tau=1#
+    		}else{#
+        		Z[i] <- Z[i-1]#
+        		signal_tau=0#
+    		}#
+    		Y <- rtruncnorm(1,-1,1, mean=X[i-1],sd=sigma_rho) #proposal for rho#
+    		U2<-runif(1)#
+    		if(signal_rho==0 && signal_tau==0 && i>nsteps/10){#
+    			temp_rho[i-1]=temp_rho[i-2]#
+    			#cat("in: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}else{ #
+    			temp_rho[i-1]=min(p(tau=Z[i],rho=Y,N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(Y,min=-1,max=1)*densigamma(Z[i],1,1)/(p(tau=Z[i],rho=X[i-1],N=N,T=length(y)-1,y=y,sigma=sigma,df=df)*dunif(X[i-1],min=-1,max=1)*densigamma(Z[i],1,1)),1)#
+    			#cat("out: Temp_rho",temp_rho[i-1],"\n\n")#
+    		}#
+    		if (U2<=temp_rho[i-1]){ #rho#
+    	 		X[i] <- Y#
+    	 		signal_rho=1#
+    		}else{#
+        		X[i] <- X[i-1]#
+        		signal_rho=0#
+    		}#
+	}#
+	return(list(X,Z)) #rho, tau#
+}
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=a)
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=spread2)
+Rho.p=gmhp_run_fast[[1]][-(1:(nsteps/10))]#
+Tau.p=gmhp_run_fast[[2]][-(1:(nsteps/10))]#
+#
+par(mfrow=c(2,1))#
+hist(Rho.p,breaks=50,main="Histogram of rho with N=100",xlab="rho")#
+hist(Tau.p,breaks=50,main="Histogram of tau with N=100",xlab="tau")
+length(a)
+a
+length(spread2)
+b=a$x
+b
+length(b)
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=a)
+gmhp.fast(rho_0=0,tau_0=0.8,sigma_rho=0.5,sigma_tau=0.15,nsteps=nsteps,y=b)
+y
+smc2(N_rho=100,N_x=200,T=length(y)-1,y=y,tau=0.5,sigma=0.5,df=2)
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/Spread Data Applied")#
+source("Trading_strategy_functions.R")#
+spreads_20_1_95=read.csv("spreads_20_1_95.csv",header=TRUE)#
+attach(spreads_20_1_95)#
+#
+T=length(sp3out)-1; h=1;#
+#
+### MORE COMPACTLY#
+#Strategy 1#
+(out3=strategy(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out9=strategy(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out11=strategy(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out17=strategy(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out31=strategy(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out45=strategy(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+(out3_g=strategy(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out9_g=strategy(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out11_g=strategy(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out17_g=strategy(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out31_g=strategy(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out45_g=strategy(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Strategy 2#
+(out2.3=strategy2(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out2.9=strategy2(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out2.11=strategy2(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out2.17=strategy2(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out2.31=strategy2(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out2.45=strategy2(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+#(in2.3_g=strategy2(spread=sp3in,up.y.pred=upin3_g,low.y.pred=lowin3_g,mean.y.pred=meanin3_g,T=T,h=h))#
+(out2.3_g=strategy2(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out2.9_g=strategy2(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out2.11_g=strategy2(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out2.17_g=strategy2(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out2.31_g=strategy2(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out2.45_g=strategy2(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Z-Score#
+os=1.65; cs=0.75; ol=-1.65; cl=-0.75#
+#
+(outz.3=z.strategy(spread=sp3out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.9=z.strategy(spread=sp9out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.11=z.strategy(spread=sp11out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.17=z.strategy(spread=sp17out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.31=z.strategy(spread=sp31out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.45=z.strategy(spread=sp45out,T=T,os=os,cs=cs,ol=ol,cl=cl))
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/Spread Data Applied")#
+source("Trading_strategy_functions.R")#
+spreads_20_10_95=read.csv("spreads_20_10_95.csv",header=TRUE)#
+attach(spreads_20_10_95)
+T=length(sp3out)-1; h=1;
+(out3=strategy(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out9=strategy(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out11=strategy(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out17=strategy(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out31=strategy(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out45=strategy(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+(out3_g=strategy(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out9_g=strategy(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out11_g=strategy(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out17_g=strategy(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out31_g=strategy(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out45_g=strategy(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Strategy 2#
+(out2.3=strategy2(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out2.9=strategy2(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out2.11=strategy2(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out2.17=strategy2(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out2.31=strategy2(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out2.45=strategy2(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+#(in2.3_g=strategy2(spread=sp3in,up.y.pred=upin3_g,low.y.pred=lowin3_g,mean.y.pred=meanin3_g,T=T,h=h))#
+(out2.3_g=strategy2(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out2.9_g=strategy2(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out2.11_g=strategy2(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out2.17_g=strategy2(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out2.31_g=strategy2(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out2.45_g=strategy2(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Z-Score#
+os=1.65; cs=0.75; ol=-1.65; cl=-0.75#
+#
+(outz.3=z.strategy(spread=sp3out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.9=z.strategy(spread=sp9out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.11=z.strategy(spread=sp11out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.17=z.strategy(spread=sp17out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.31=z.strategy(spread=sp31out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.45=z.strategy(spread=sp45out,T=T,os=os,cs=cs,ol=ol,cl=cl))
+T=length(sp3out)-1; h=1; factor=0.25
+(out3=strategy(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))*factor#
+(out9=strategy(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))*factor#
+(out11=strategy(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))*factor#
+(out17=strategy(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))*factor#
+(out31=strategy(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))*factor#
+(out45=strategy(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))*factor#
+#
+(out3_g=strategy(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))*factor#
+(out9_g=strategy(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))*factor#
+(out11_g=strategy(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))*factor#
+(out17_g=strategy(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))*factor#
+(out31_g=strategy(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))*factor#
+(out45_g=strategy(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))*factor#
+#
+# Strategy 2#
+(out2.3=strategy2(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))*factor#
+(out2.9=strategy2(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))*factor#
+(out2.11=strategy2(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))*factor#
+(out2.17=strategy2(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))*factor#
+(out2.31=strategy2(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))*factor#
+(out2.45=strategy2(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))*factor#
+#
+(out2.3_g=strategy2(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))*factor#
+(out2.9_g=strategy2(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))*factor#
+(out2.11_g=strategy2(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))*factor#
+(out2.17_g=strategy2(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))*factor#
+(out2.31_g=strategy2(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))*factor#
+(out2.45_g=strategy2(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))*factor#
+#
+# Z-Score#
+os=1.65; cs=0.75; ol=-1.65; cl=-0.75#
+#
+(outz.3=z.strategy(spread=sp3out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor#
+(outz.9=z.strategy(spread=sp9out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor#
+(outz.11=z.strategy(spread=sp11out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor#
+(outz.17=z.strategy(spread=sp17out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor#
+(outz.31=z.strategy(spread=sp31out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor#
+(outz.45=z.strategy(spread=sp45out,T=T,os=os,cs=cs,ol=ol,cl=cl))*factor
+(out3=strategy(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))
+(out3=strategy(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out9=strategy(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out11=strategy(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out17=strategy(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out31=strategy(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out45=strategy(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+(out3_g=strategy(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out9_g=strategy(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out11_g=strategy(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out17_g=strategy(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out31_g=strategy(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out45_g=strategy(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Strategy 2#
+(out2.3=strategy2(spread=sp3out,up.y.pred=upout3,low.y.pred=lowout3,mean.y.pred=meanout3,T=T,h=h))#
+(out2.9=strategy2(spread=sp9out,up.y.pred=upout9,low.y.pred=lowout9,mean.y.pred=meanout9,T=T,h=h))#
+(out2.11=strategy2(spread=sp11out,up.y.pred=upout11,low.y.pred=lowout11,mean.y.pred=meanout11,T=T,h=h))#
+(out2.17=strategy2(spread=sp17out,up.y.pred=upout17,low.y.pred=lowout17,mean.y.pred=meanout17,T=T,h=h))#
+(out2.31=strategy2(spread=sp31out,up.y.pred=upout31,low.y.pred=lowout31,mean.y.pred=meanout31,T=T,h=h))#
+(out2.45=strategy2(spread=sp45out,up.y.pred=upout45,low.y.pred=lowout45,mean.y.pred=meanout45,T=T,h=h))#
+#
+(out2.3_g=strategy2(spread=sp3out,up.y.pred=upout3_g,low.y.pred=lowout3_g,mean.y.pred=meanout3_g,T=T,h=h))#
+(out2.9_g=strategy2(spread=sp9out,up.y.pred=upout9_g,low.y.pred=lowout9_g,mean.y.pred=meanout9_g,T=T,h=h))#
+(out2.11_g=strategy2(spread=sp11out,up.y.pred=upout11_g,low.y.pred=lowout11_g,mean.y.pred=meanout11_g,T=T,h=h))#
+(out2.17_g=strategy2(spread=sp17out,up.y.pred=upout17_g,low.y.pred=lowout17_g,mean.y.pred=meanout17_g,T=T,h=h))#
+(out2.31_g=strategy2(spread=sp31out,up.y.pred=upout31_g,low.y.pred=lowout31_g,mean.y.pred=meanout31_g,T=T,h=h))#
+(out2.45_g=strategy2(spread=sp45out,up.y.pred=upout45_g,low.y.pred=lowout45_g,mean.y.pred=meanout45_g,T=T,h=h))#
+#
+# Z-Score#
+os=1.65; cs=0.75; ol=-1.65; cl=-0.75#
+#
+(outz.3=z.strategy(spread=sp3out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.9=z.strategy(spread=sp9out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.11=z.strategy(spread=sp11out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.17=z.strategy(spread=sp17out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.31=z.strategy(spread=sp31out,T=T,os=os,cs=cs,ol=ol,cl=cl))#
+(outz.45=z.strategy(spread=sp45out,T=T,os=os,cs=cs,ol=ol,cl=cl))
+setwd("/Users/tillkischkat/Desktop/MSc Statistics/Trimester 3/Statistical Arbitrage/R:MATLAB Code/Spread Data Applied")
+source("SMC2_SV_functions_spread_data.R")
+N=10000; sigma_rho=0.1; sigma_tau=0.1; sigma_sigma=0.1; T=length(spreadin3)-1; #N=N_theta=N_x#
+h=1; ci.l=0.025; ci.u=0.975; ess=0.3; magnification=10
+### RESULTS#
+#
+factor_mag=0.2#
+factor_bb=9/4#
+factor_two=2#
+#
+# SPX#
+# t-model#
+ret3s1=0.06302787*factor_mag; ret3s2=-0.2701991*factor_mag#
+trade3s1=4; trade3s2=0#
+vola3s1=0.05576258*factor_mag; vola3s2=0.05767008*factor_mag#
+#
+ret9s1=-0.003201718*factor_mag; ret9s2=0.02276537*factor_mag#
+trade9s1=1; trade9s2=1#
+vola9s1=0.01252656*factor_mag; vola9s2=0.01387169*factor_mag#
+#
+ret11s1=0.1154271*factor_mag; ret11s2=0.1858135*factor_mag#
+trade11s1=5; trade11s2=3#
+vola11s1=0.03739819*factor_mag; vola11s2=0.08243626*factor_mag#
+#
+ret17s1=0.0199404*factor_mag; ret17s2=0.0548594*factor_mag#
+trade17s1=1; trade17s2=1#
+vola17s1=0.00153398*factor_mag; vola17s2=0.006102428*factor_mag#
+#
+ret31s1=0; ret31s2=0#
+trade31s1=0; trade31s2=0#
+vola31s1=0; vola31s2=0#
+#
+ret45s1=-0.1943415*factor_mag; ret45s2=-0.1943415*factor_mag#
+trade45s1=0; trade45s2=0#
+vola45s1=0.0533842*factor_mag; vola45s2=0.0533842*factor_mag#
+#
+# Gaussian-model#
+ret3s1_g=0.01190238*factor_mag; ret3s2_g=-0.28622192*factor_mag#
+trade3s1_g=5; trade3s2_g=0#
+vola3s1_g=0.05723273*factor_mag; vola3s2_g=0.05654003*factor_mag#
+#
+ret9s1_g=-0.003312878*factor_mag; ret9s2_g=0.01948689*factor_mag#
+trade9s1_g=1; trade9s2_g=1#
+vola9s1_g=0.01245601*factor_mag; vola9s2_g=0.01325699*factor_mag#
+#
+ret11s1_g=0.0870965*factor_mag; ret11s2_g=0.1867792*factor_mag#
+trade11s1_g=5; trade11s2_g=3#
+vola11s1_g=0.03040009*factor_mag; vola11s2_g=0.08740133*factor_mag#
+#
+ret17s1_g=0.0209415*factor_mag; ret17s2_g=0.03026586*factor_mag#
+trade17s1_g=1; trade17s2_g=1#
+vola17s1_g=0.00163489*factor_mag; vola17s2_g=0.003394132*factor_mag#
+#
+ret31s1_g=0; ret31s2_g=0#
+trade31s1_g=0; trade31s2_g=0#
+vola31s1_g=0; vola31s2_g=0#
+#
+ret45s1_g=0; ret45s2_g=0#
+trade45s1_g=0; trade45s2_g=0#
+vola45s1_g=0; vola45s2_g=0#
+#
+# Bollinger bands#
+ret3s1_bb=0.002609152*factor_bb; ret3s2_bb=-0.03420021*factor_bb#
+trade3s1_bb=2; trade3s2_bb=1#
+vola3s1_bb=0.004258048*factor_bb; vola3s2_bb=0.006331942*factor_bb#
+#
+ret9s1_bb=-0.0003851668*factor_bb; ret9s2_bb=-0.0007584346*factor_bb#
+trade9s1_bb=5; trade9s2_bb=2#
+vola9s1_bb=0.00120138*factor_bb; vola9s2_bb=0.001589647*factor_bb#
+#
+ret11s1_bb=0.04740633*factor_bb; ret11s2_bb=0.03492264*factor_bb#
+trade11s1_bb=4; trade11s2_bb=1#
+vola11s1_bb=0.006381572*factor_bb; vola11s2_bb=0.009852952*factor_bb#
+#
+ret17s1_bb=0.02803031*factor_bb; ret17s2_bb=0.03201643*factor_bb#
+trade17s1_bb=5; trade17s2_bb=0#
+vola17s1_bb=0.00841921*factor_bb; vola17s2_bb=0.009895863*factor_bb#
+#
+ret31s1_bb=0.01248983*factor_bb; ret31s2_bb=-0.009611625*factor_bb#
+trade31s1_bb=7; trade31s2_bb=2#
+vola31s1_bb=0.004993835*factor_bb; vola31s2_bb=0.006524315*factor_bb#
+#
+ret45s1_bb=0.01709259*factor_bb; ret45s2_bb=0.001450348*factor_bb#
+trade45s1_bb=5; trade45s2_bb=3#
+vola45s1_bb=0.007847477*factor_bb; vola45s2_bb=0.008229475*factor_bb#
+#
+# Z-Score#
+ret3z=-0.01697756*factor_two#
+trade3z=1#
+vola3z=0.00499066*factor_two#
+#
+ret9z=0.0001767541*factor_two#
+trade9z=1#
+vola9z=0.001057063*factor_two#
+#
+ret11z=0.01954738*factor_two#
+trade11z=1#
+vola11z=0.005745735*factor_two#
+#
+ret17z=0#
+trade17z=0#
+vola17z=0#
+#
+ret31z=0#
+trade31z=0#
+vola31z=0#
+#
+ret45z=0#
+trade45z=0#
+vola45z=0#
+#
+####
+strat1_ret=c(ret3s1,ret9s1,ret11s1,ret17s1,ret31s1,ret45s1)#
+strat1_ret_g=c(ret3s1_g,ret9s1_g,ret11s1_g,ret17s1_g,ret31s1_g,ret45s1_g)#
+strat1_ret_bb=c(ret3s1_bb,ret9s1_bb,ret11s1_bb,ret17s1_bb,ret31s1_bb,ret45s1_bb)#
+z_score_ret=c(ret3z,ret9z,ret11z,ret17z,ret31z,ret45z)#
+#
+strat1_vola=c(vola3s1,vola9s1,vola11s1,vola17s1,vola31s1,vola45s1)#
+strat1_vola_g=c(vola3s1_g,vola9s1_g,vola11s1_g,vola17s1_g,vola31s1_g,vola45s1_g)#
+strat1_vola_bb=c(vola3s1_bb,vola9s1_bb,vola11s1_bb,vola17s1_bb,vola31s1_bb,vola45s1_bb)#
+z_score_vola=c(vola3z,vola9z,vola11z,vola17z,vola31z,vola45z)#
+#
+plot(strat1_vola,strat1_ret,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Mean-Reversion Strategy SPX Spread Data",ylim=c(-0.05,0.065),xlim=c(0,0.02))#
+points(jitter(strat1_vola_g),jitter(strat1_ret_g),col="blue")#
+points(jitter(strat1_vola_bb),jitter(strat1_ret_bb),col="green")#
+points(jitter(z_score_vola),jitter(z_score_ret),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)#
+#
+####
+strat2_ret=c(ret3s2,ret9s2,ret11s2,ret17s2,ret31s2,ret45s2)#
+strat2_ret_g=c(ret3s2_g,ret9s2_g,ret11s2_g,ret17s2_g,ret31s2_g,ret45s2_g)#
+strat2_ret_bb=c(ret3s2_bb,ret9s2_bb,ret11s2_bb,ret17s2_bb,ret31s2_bb,ret45s2_bb)#
+z_score_ret=c(ret3z,ret9z,ret11z,ret17z,ret31z,ret45z)#
+#
+strat2_vola=c(vola3s2,vola9s2,vola11s2,vola17s2,vola31s2,vola45s2)#
+strat2_vola_g=c(vola3s2_g,vola9s2_g,vola11s2_g,vola17s2_g,vola31s2_g,vola45s2_g)#
+strat2_vola_bb=c(vola3s2_bb,vola9s2_bb,vola11s2_bb,vola17s2_bb,vola31s2_bb,vola45s2_bb)#
+z_score_vola=c(vola3z,vola9z,vola11z,vola17z,vola31z,vola45z)#
+#
+plot(strat2_vola,strat2_ret,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Band-Reversion Strategy SPX Spread Data",ylim=c(-0.06,0.05))#
+points(jitter(strat2_vola_g),jitter(strat2_ret_g),col="blue")#
+points(jitter(strat2_vola_bb),jitter(strat2_ret_bb),col="green")#
+points(jitter(z_score_vola),jitter(z_score_ret),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)#
+#
+################################
+#
+# UKX#
+# t-model#
+ret2uks1=0.0161869*factor_mag; ret2uks2=-0.006335875*factor_mag#
+trade2uks1=17; trade2uks2=10#
+vola2uks1=0.07619458*factor_mag; vola2uks2=0.09786191*factor_mag#
+#
+ret8uks1=-0.1081344*factor_mag; ret8uks2=-0.02622708*factor_mag#
+trade8uks1=16; trade8uks2=9#
+vola8uks1=0.03710263*factor_mag; vola8uks2=0.05136065*factor_mag#
+#
+ret12uks1=-0.4735562*factor_mag; ret12uks2=-0.6776507*factor_mag#
+trade12uks1=22; trade12uks2=12#
+vola12uks1=0.1347666*factor_mag; vola12uks2=0.163455*factor_mag#
+#
+ret16uks1=0.102737*factor_mag; ret16uks2=0.04664204*factor_mag#
+trade16uks1=12; trade16uks2=7#
+vola16uks1=0.07844268*factor_mag; vola16uks2=0.09609253*factor_mag#
+#
+ret20uks1=0.03700255*factor_mag; ret20uks2=0.03592568*factor_mag#
+trade20uks1=4; trade20uks2=2#
+vola20uks1=0.02406473*factor_mag; vola20uks2=0.03231834*factor_mag#
+#
+# Gaussian-model#
+ret2uks1_g=0.02517283*factor_mag; ret2uks2_g=-0.01790553*factor_mag#
+trade2uks1_g=17; trade2uks2_g=10#
+vola2uks1_g=0.07313537*factor_mag; vola2uks2_g=0.09910574*factor_mag#
+#
+ret8uks1_g=-0.1032611*factor_mag; ret8uks2_g=0.1535554*factor_mag#
+trade8uks1_g=19; trade8uks2_g=16#
+vola8uks1_g=0.04475459*factor_mag; vola8uks2_g=0.0490194*factor_mag#
+#
+ret12uks1_g=-0.07803151*factor_mag; ret12uks2_g=-0.2733168*factor_mag#
+trade12uks1_g=23; trade12uks2_g=16#
+vola12uks1_g=0.1335519*factor_mag; vola12uks2_g=0.151341*factor_mag#
+#
+ret16uks1_g=0.05711912*factor_mag; ret16uks2_g=0.001024157*factor_mag#
+trade16uks1_g=12; trade16uks2_g=7#
+vola16uks1_g=0.07680783*factor_mag; vola16uks2_g=0.09474794*factor_mag#
+#
+ret20uks1_g=0.03933864*factor_mag; ret20uks2_g=0.05399453*factor_mag#
+trade20uks1_g=13; trade20uks2_g=8#
+vola20uks1_g=0.03812538*factor_mag; vola20uks2_g=0.06173256*factor_mag#
+#
+# Bollinger bands#
+ret2uks1_bb=-0.003396317*factor_bb; ret2uks2_bb=0.01054831*factor_bb#
+trade2uks1_bb=4; trade2uks2_bb=1#
+vola2uks1_bb=0.006543727*factor_bb; vola2uks2_bb=0.007716208*factor_bb#
+#
+ret8uks1_bb=0.006222548*factor_bb; ret8uks2_bb=0.02429683*factor_bb#
+trade8uks1_bb=4; trade8uks2_bb=2#
+vola8uks1_bb=0.003676662*factor_bb; vola8uks2_bb=0.004384032*factor_bb#
+#
+ret12uks1_bb=0.08579688*factor_bb; ret12uks2_bb=0.1002127*factor_bb#
+trade12uks1_bb=8; trade12uks2_bb=3#
+vola12uks1_bb=0.01409554*factor_bb; vola12uks2_bb=0.01834178*factor_bb#
+#
+ret16uks1_bb=0.002762629*factor_bb; ret16uks2_bb=0.01460136*factor_bb#
+trade16uks1_bb=2; trade16uks2_bb=1#
+vola16uks1_bb=0.004149944*factor_bb; vola16uks2_bb=0.01149574*factor_bb#
+#
+ret20uks1_bb=0.006788427*factor_bb; ret20uks2_bb=-0.007094596*factor_bb#
+trade20uks1_bb=4; trade20uks2_bb=1#
+vola20uks1_bb=0.004297121*factor_bb; vola20uks2_bb=0.006876809*factor_bb#
+#
+# Z-Score#
+ret2ukz=0.01463852*factor_two#
+trade2ukz=1#
+vola2ukz=0.002150033*factor_two#
+#
+ret8ukz=0.02217547*factor_two#
+trade8ukz=2#
+vola8ukz=0.002711626*factor_two#
+#
+ret12ukz=0.0240503*factor_two#
+trade12ukz=1#
+vola12ukz=0.005817352*factor_two#
+#
+ret16ukz=0.01517001*factor_two#
+trade16ukz=3#
+vola16ukz=0.005700138*factor_two#
+#
+ret20ukz=0.004429708*factor_two#
+trade20ukz=1#
+vola20ukz=0.00408355*factor_two#
+#
+####
+strat1_ret_uk=c(ret2uks1,ret8uks1,ret12uks1,ret16uks1,ret20uks1)#
+strat1_ret_g_uk=c(ret2uks1_g,ret8uks1_g,ret12uks1_g,ret16uks1_g,ret20uks1_g)#
+strat1_ret_bb_uk=c(ret2uks1_bb,ret9s1_bb,ret12uks1_bb,ret16uks1_bb,ret20uks1_bb)#
+z_score_ret_uk=c(ret2ukz,ret8ukz,ret12ukz,ret16ukz,ret20ukz)#
+#
+strat1_vola_uk=c(vola2uks1,vola8uks1,vola12uks1,vola16uks1,vola20uks1)#
+strat1_vola_g_uk=c(vola2uks1_g,vola8uks1_g,vola12uks1_g,vola16uks1_g,vola20uks1_g)#
+strat1_vola_bb_uk=c(vola2uks1_bb,vola8uks1_bb,vola12uks1_bb,vola16uks1_bb,vola20uks1_bb)#
+z_score_vola_uk=c(vola2ukz,vola8ukz,vola12ukz,vola16ukz,vola20ukz)#
+#
+plot(strat1_vola_uk,strat1_ret_uk,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Mean-Reversion Strategy UKX Spread Data",xlim=c(0,0.032),ylim=c(-0.1,0.2))#
+points(jitter(strat1_vola_g_uk),jitter(strat1_ret_g_uk),col="blue")#
+points(jitter(strat1_vola_bb_uk),jitter(strat1_ret_bb_uk),col="green")#
+points(jitter(z_score_vola_uk),jitter(z_score_ret_uk),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)#
+#
+####
+strat2_ret_uk=c(ret2uks2,ret8uks2,ret12uks2,ret16uks2,ret20uks2)#
+strat2_ret_g_uk=c(ret2uks2_g,ret8uks2_g,ret12uks2_g,ret16uks2_g,ret20uks2_g)#
+strat2_ret_bb_uk=c(ret2uks2_bb,ret8uks2_bb,ret12uks2_bb,ret16uks2_bb,ret20uks2_bb)#
+z_score_ret_uk=c(ret2ukz,ret8ukz,ret12ukz,ret16ukz,ret20ukz)#
+#
+strat2_vola_uk=c(vola2uks2,vola8uks2,vola12uks2,vola16uks2,vola20uks2)#
+strat2_vola_g_uk=c(vola2uks2_g,vola8uks2_g,vola12uks2_g,vola16uks2_g,vola20uks2_g)#
+strat2_vola_bb_uk=c(vola2uks2_bb,vola8uks2_bb,vola12uks2_bb,vola16uks2_bb,vola20uks2_bb)#
+z_score_vola_uk=c(vola2ukz,vola8ukz,vola12ukz,vola16ukz,vola20ukz)#
+#
+plot(strat2_vola_uk,strat2_ret_uk,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Band-Reversion Strategy UKX Spread Data",ylim=c(-0.13,0.22),xlim=c(0,0.045))#
+points(jitter(strat2_vola_g_uk),jitter(strat2_ret_g_uk),col="blue")#
+points(jitter(strat2_vola_bb_uk),jitter(strat2_ret_bb_uk),col="green")#
+points(jitter(z_score_vola_uk),jitter(z_score_ret_uk),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)#
+#
+####
+# FX#
+# t-model#
+ret99s1=0.02502479*factor_two; ret99s2=0.0328493*factor_two#
+trade99s1=4; trade99s2=1#
+vola99s1=0.01900125*factor_two; vola99s2=0.02961574*factor_two#
+#
+ret00s1=0.0007394985*factor_two; ret00s2=-0.03105211*factor_two#
+trade00s1=3; trade00s2=1#
+vola00s1=0.06893368*factor_two; vola00s2=0.06916108*factor_two#
+#
+ret02s1=0.06415557*factor_two; ret02s2=-0.02609881*factor_mag#
+trade02s1=3; trade02s2=1#
+vola02s1=0.02004834*factor_two; vola02s2=0.0268948*factor_two#
+#
+ret07s1=0.01467677*factor_two; ret07s2=-0.00797954*factor_two#
+trade07s1=2; trade07s2=0#
+vola07s1=0.008762801*factor_two; vola07s2=0.02508441*factor_two#
+#
+ret09s1=0.02027058*factor_two; ret09s2=-0.06020404*factor_two#
+trade09s1=2; trade09s2=0#
+vola09s1=0.01847837*factor_two; vola09s2=0.04536814*factor_two#
+#
+ret12s1=0.01163803*factor_two; ret12s2=-0.07954737*factor_two#
+trade12s1=2; trade12s2=0#
+vola12s1=0.013568*factor_two; vola12s2=0.04409881*factor_two#
+#
+# Gaussian-model#
+ret99s1_g=0.02917036*factor_two; ret99s2_g=-0.008923422*factor_two#
+trade99s1_g=2; trade99s2_g=1#
+vola99s1_g=0.01646956*factor_two; vola99s2_g=0.02674864*factor_two#
+#
+ret00s1_g=0.0007394985*factor_two; ret00s2_g=-0.03105211*factor_two#
+trade00s1_g=3; trade00s2_g=1#
+vola00s1_g=0.06893368*factor_two; vola00s2_g=0.06916108*factor_two#
+#
+ret02s1_g=0.06244007*factor_two; ret02s2_g=0.03976952*factor_two#
+trade02s1_g=3; trade02s2_g=1#
+vola02s1_g=0.02253489*factor_two; vola02s2_g=0.02657524*factor_two#
+#
+ret07s1_g=0.06260921*factor_two; ret07s2_g=0.002693786*factor_two#
+trade07s1_g=5; trade07s2_g=2#
+vola07s1_g=0.01982025*factor_two; vola07s2_g=0.02901575*factor_two#
+#
+ret09s1_g=-0.003346411*factor_two; ret09s2_g=-0.02982698*factor_two#
+trade09s1_g=5; trade09s2_g=2#
+vola09s1_g=0.03496818*factor_two; vola09s2_g=0.05430604*factor_two#
+#
+ret12s1_g=0.01017152*factor_two; ret12s2_g=-0.07954737*factor_two#
+trade12s1_g=2; trade12s2_g=0#
+vola12s1_g=0.01293872*factor_two; vola12s2_g=0.04388605*factor_two#
+#
+# Bollinger bands#
+ret99s1_bb=0.06267696*factor_bb; ret99s2_bb=0.02985329*factor_bb#
+trade99s1_bb=4; trade99s2_bb=2#
+vola99s1_bb=0.02187219*factor_bb; vola99s2_bb=0.04103769*factor_bb#
+#
+ret00s1_bb=-4.625104e-05*factor_bb; ret00s2_bb=0.06404183*factor_bb#
+trade00s1_bb=3; trade00s2_bb=1#
+vola00s1_bb=0.06091879*factor_bb; vola00s2_bb=0.06140447*factor_bb#
+#
+ret02s1_bb=0.02829152*factor_bb; ret02s2_bb=-0.00800245*factor_bb#
+trade02s1_bb=3; trade02s2_bb=1#
+vola02s1_bb=0.02488473*factor_bb; vola02s2_bb=0.02530754*factor_bb#
+#
+ret07s1_bb=0.005827422*factor_bb; ret07s2_bb=0.0899957*factor_bb#
+trade07s1_bb=3; trade07s2_bb=2#
+vola07s1_bb=0.0244336*factor_bb; vola07s2_bb=0.02650966*factor_bb#
+#
+ret09s1_bb=0.02880289*factor_bb; ret09s2_bb=0.1285762*factor_bb#
+trade09s1_bb=4; trade09s2_bb=1#
+vola09s1_bb=0.05112254*factor_bb; vola09s2_bb=0.06476498*factor_bb#
+#
+ret12s1_bb=0.08460031*factor_bb; ret12s2_bb=0.1086715*factor_bb#
+trade12s1_bb=4; trade12s2_bb=3#
+vola12s1_bb=0.05145464*factor_bb; vola12s2_bb=0.0472939*factor_bb#
+#
+# Z-Score#
+ret99z=0.03880204*factor_two#
+trade99z=1#
+vola99z=0.019052*factor_two#
+#
+ret00z=0#
+trade00z=0#
+vola00z=0#
+#
+ret02z=-0.07213727*factor_two#
+trade02z=0#
+vola02z=0.01871216*factor_two#
+#
+ret07z=0.08962868*factor_two#
+trade07z=2#
+vola07z=0.02319646*factor_two#
+#
+ret09z=0.1064505*factor_two#
+trade09z=2#
+vola09z=0.03068225*factor_two#
+#
+ret12z=0#
+trade12z=0#
+vola12z=0#
+#
+####
+strat1_ret_fx=c(ret99s1,ret00s1,ret02s1,ret07s1,ret09s1,ret12s1)#
+strat1_ret_g_fx=c(ret99s1_g,ret00s1_g,ret02s1_g,ret07s1_g,ret09s1_g,ret12s1_g)#
+strat1_ret_bb_fx=c(ret99s1_bb,ret00s1_bb,ret02s1_bb,ret07s1_bb,ret09s1_bb,ret12s1_bb)#
+z_score_ret_fx=c(ret99z,ret00z,ret02z,ret07z,ret09z,ret12z)#
+#
+strat1_vola_fx=c(vola99s1,vola00s1,vola02s1,vola07s1,vola09s1,vola45s1)#
+strat1_vola_g_fx=c(vola99s1_g,vola00s1_g,vola02s1_g,vola07s1_g,vola09s1_g,vola12s1_g)#
+strat1_vola_bb_fx=c(vola99s1_bb,vola00s1_bb,vola02s1_bb,vola07s1_bb,vola09s1_bb,vola12s1_bb)#
+z_score_vola_fx=c(vola99z,vola00z,vola02z,vola07z,vola09z,vola12z)#
+#
+plot(strat1_vola_fx,strat1_ret_fx,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Mean-Reversion Strategy FX Spread Data",ylim=c(-0.18,0.22),xlim=c(0,0.15))#
+points(jitter(strat1_vola_g_fx),jitter(strat1_ret_g_fx),col="blue")#
+points(jitter(strat1_vola_bb_fx),jitter(strat1_ret_bb_fx),col="green")#
+points(jitter(z_score_vola_fx),jitter(z_score_ret_fx),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)#
+#
+####
+strat2_ret_fx=c(ret99s2,ret00s2,ret02s2,ret07s2,ret09s2,ret12s2)#
+strat2_ret_g_fx=c(ret99s2_g,ret00s2_g,ret02s2_g,ret07s2_g,ret09s2_g,ret12s2_g)#
+strat2_ret_bb_fx=c(ret99s2_bb,ret00s2_bb,ret02s2_bb,ret07s2_bb,ret09s2_bb,ret12s2_bb)#
+z_score_ret_fx=c(ret99z,ret00z,ret02z,ret07z,ret09z,ret12z)#
+#
+strat2_vola_fx=c(vola99s2,vola00s2,vola02s2,vola07s2,vola09s2,vola12s2)#
+strat2_vola_g_fx=c(vola99s2_g,vola9s2_g,vola02s2_g,vola07s2_g,vola09s2_g,vola12s2_g)#
+strat2_vola_bb_fx=c(vola99s2_bb,vola00s2_bb,vola02s2_bb,vola07s2_bb,vola09s2_bb,vola12s2_bb)#
+z_score_vola_fx=c(vola99z,vola00z,vola02z,vola07z,vola09z,vola12z)#
+#
+plot(strat2_vola_fx,strat2_ret_fx,xlab="Annualised Execution Volatility",ylab="Annualised Cumulative Return",main="Band-Reversion Strategy FX Spread Data",ylim=c(-0.2,0.35),xlim=c(0,0.18))#
+points(jitter(strat2_vola_g_fx),jitter(strat2_ret_g_fx),col="blue")#
+points(jitter(strat2_vola_bb_fx),jitter(strat2_ret_bb_fx),col="green")#
+points(jitter(z_score_vola_fx),jitter(z_score_ret_fx),col="red")#
+legend("bottomright",c("t Model","Gaussian Model","Bollinger Bands","Z-Score"),pch=1,col=c("black","blue","green","red"),cex=0.8)
