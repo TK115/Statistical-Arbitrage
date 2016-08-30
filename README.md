@@ -1,3 +1,3 @@
 # Statistical-Arbitrage
 
-Hello world
+Using Particle Filter techniques such as Sequential Monte Carlo Squared
